@@ -1,5 +1,10 @@
 import "./style.css";
+import { setupRenderPositionOnCanvas } from "./utils/canvas";
+import { getDistance, isPointInsideArea } from "./utils/math";
 
+/**
+ * CONSTANTS
+ */
 const imgEl = document.querySelector("#imgEl");
 const canvas = document.querySelector("#main-canvas");
 const ctx = canvas.getContext("2d");
@@ -11,26 +16,15 @@ const SCALE_MOVING_FACTOR = 40;
 const MAX_SCALE = 10;
 const MIN_SCALE = 0.5;
 
-function getDistance(pointA, pointB) {
-  return Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
-}
-
-function isPointInsideArea(point, rect) {
-  return (
-    point.x >= rect.x &&
-    point.x <= rect.x + rect.width &&
-    point.y >= rect.y &&
-    point.y <= rect.y + rect.height
-  );
-}
-
 function getImageSource(orientation) {
   return orientation === "landscape"
     ? "./nature-landscape.png"
     : "./nature-portrait.png";
 }
 
-// state
+/**
+ * STATES
+ */
 let animationID = 0;
 let isPinching = false;
 let isPanning = false;
@@ -40,60 +34,9 @@ let baseScale = 1;
 let desWidth = 0;
 let desHeight = 0;
 let pinchMidPoint = null;
-
 const desPos = { x: 0, y: 0 };
 const offsetPos = { x: 0, y: 0 };
 const gapPos = { x: 0, y: 0 };
-
-function setupRenderPositionOnCanvas() {
-  desPos.x = 0;
-  desPos.y = 0;
-
-  const imgRatio = imgEl.naturalWidth / imgEl.naturalHeight;
-  const canvasRatio = canvas.width / canvas.height;
-
-  const imgIsLandscape = imgRatio >= 1;
-  const canvasIsLandscape = canvasRatio >= 1;
-
-  // --- Orientation-based scaling ---
-  if (imgIsLandscape && canvasIsLandscape) {
-    // Both are landscape
-    if (imgRatio > canvasRatio) {
-      // Image wider → fit width
-      desWidth = canvas.width;
-      desHeight = (canvas.width * imgEl.naturalHeight) / imgEl.naturalWidth;
-      desPos.y = (canvas.height - desHeight) / 2;
-    } else {
-      // Image narrower -> fit height
-      desHeight = canvas.height;
-      desWidth = (canvas.height * imgEl.naturalWidth) / imgEl.naturalHeight;
-      desPos.x = (canvas.width - desWidth) / 2;
-    }
-  } else if (!imgIsLandscape && !canvasIsLandscape) {
-    // Both are portrait
-    if (imgRatio > canvasRatio) {
-      // Image relatively wider → fit width
-      desWidth = canvas.width;
-      desHeight = imgEl.naturalHeight * (canvas.width / imgEl.naturalWidth);
-      desPos.y = (canvas.height - desHeight) / 2;
-    } else {
-      // Image relatively taller → fit height
-      desHeight = canvas.height;
-      desWidth = imgEl.naturalWidth * (canvas.height / imgEl.naturalHeight);
-      desPos.x = (canvas.width - desWidth) / 2;
-    }
-  } else if (imgIsLandscape && !canvasIsLandscape) {
-    // Image landscape, canvas portrait → fit width
-    desWidth = canvas.width;
-    desHeight = imgEl.naturalHeight * (canvas.width / imgEl.naturalWidth);
-    desPos.y = -(desHeight - canvas.height) / 2;
-  } else {
-    // Image portrait, canvas landscape → fit height
-    desHeight = canvas.height;
-    desWidth = imgEl.naturalWidth * (canvas.height / imgEl.naturalHeight);
-    desPos.x = -(desWidth - canvas.width) / 2;
-  }
-}
 
 canvas.addEventListener("touchstart", (e) => {
   e.preventDefault();
@@ -139,7 +82,7 @@ canvas.addEventListener("touchmove", (e) => {
     offsetPos.y = e.touches[0].clientY - canvasDOMRect.y;
     const point = { x: offsetPos.x, y: offsetPos.y };
 
-    if (!isPointInsideArea(point, canvasRect)) return;
+    if (!isPointInsideArea(offsetPos, canvasRect)) return;
 
     if (isPointInsideArea(point, imageRect)) {
       desPos.x = offsetPos.x - gapPos.x;
@@ -290,11 +233,20 @@ function animate() {
   animationID = window.requestAnimationFrame(animate);
 }
 
-function startAnimation(width, height) {
+function startAnimation(cavasWidth, canvasHeight) {
   stopAnimation(animationID);
-  canvas.width = width;
-  canvas.height = height;
-  setupRenderPositionOnCanvas();
+  canvas.width = cavasWidth;
+  canvas.height = canvasHeight;
+  const {
+    desX,
+    desY,
+    desWidth: dW,
+    desHeight: dH,
+  } = setupRenderPositionOnCanvas(imgEl, canvas);
+  desPos.x = desX;
+  desPos.y = desY;
+  desWidth = dW;
+  desHeight = dH;
 
   animate();
 }
