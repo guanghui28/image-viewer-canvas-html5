@@ -214,6 +214,7 @@ function drawGrid() {
   const colGap = canvas.width / COLS;
 
   ctx.save();
+  ctx.beginPath();
   ctx.lineWidth = 1;
   ctx.strokeStyle = "#dfdfdf";
 
