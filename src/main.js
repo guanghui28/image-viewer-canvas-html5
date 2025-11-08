@@ -8,6 +8,19 @@ const imgSelectEl = document.querySelector("#picture-orientation");
 const ROWS = 3;
 const COLS = 3;
 
+function getDistance(pointA, pointB) {
+  return Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
+}
+
+function isPointInsideArea(point, rect) {
+  return (
+    point.x >= rect.x &&
+    point.x <= rect.x + rect.width &&
+    point.y >= rect.y &&
+    point.y <= rect.y + rect.height
+  );
+}
+
 function getImageSource(orientation) {
   return orientation === "landscape"
     ? "./nature-landscape.png"
@@ -18,9 +31,12 @@ function getImageSource(orientation) {
 let animationID = 0;
 let isPinching = false;
 let isPanning = false;
+let startDistance = 0;
 let scale = 1;
+let baseScale = 1;
 let desWidth = 0;
 let desHeight = 0;
+let pinchMidPoint = null;
 
 const desPos = { x: 0, y: 0 };
 const offsetPos = { x: 0, y: 0 };
@@ -79,41 +95,51 @@ function setupRenderPositionOnCanvas() {
 canvas.addEventListener("touchstart", (e) => {
   e.preventDefault();
 
-  if (e.changedTouches.length === 1) {
+  if (e.touches.length === 1) {
+    isPanning = true;
+    isPinching = false;
     const canvasDOMRect = canvas.getBoundingClientRect();
-    offsetPos.x = e.changedTouches[0].clientX - canvasDOMRect.x;
-    offsetPos.y = e.changedTouches[0].clientY - canvasDOMRect.y;
+    offsetPos.x = e.touches[0].clientX - canvasDOMRect.x;
+    offsetPos.y = e.touches[0].clientY - canvasDOMRect.y;
     gapPos.x = offsetPos.x - desPos.x;
     gapPos.y = offsetPos.y - desPos.y;
+  } else if (e.touches.length === 2) {
+    isPinching = true;
+    isPanning = false;
+    startDistance = getDistance(
+      { x: e.touches[0].clientX, y: e.touches[0].clientY },
+      { x: e.touches[1].clientX, y: e.touches[1].clientY }
+    );
+    baseScale = scale;
   }
 });
 
-function isPointInsideArea(point, rect) {
-  return (
-    point.x >= rect.x &&
-    point.x <= rect.x + rect.width &&
-    point.y >= rect.y &&
-    point.y <= rect.y + rect.height
-  );
-}
-
 canvas.addEventListener("touchmove", (e) => {
   e.preventDefault();
-  console.log("=======touch move========");
+  const canvasDOMRect = canvas.getBoundingClientRect();
 
-  if (e.changedTouches.length === 1) {
-    const canvasDOMRect = canvas.getBoundingClientRect();
-    offsetPos.x = e.changedTouches[0].clientX - canvasDOMRect.x;
-    offsetPos.y = e.changedTouches[0].clientY - canvasDOMRect.y;
+  if (isPanning) {
+    const canvasRect = {
+      x: 0,
+      y: 0,
+      width: canvasDOMRect.width,
+      height: canvasDOMRect.height,
+    };
+
+    offsetPos.x = e.touches[0].clientX - canvasDOMRect.x;
+    offsetPos.y = e.touches[0].clientY - canvasDOMRect.y;
     const point = { x: offsetPos.x, y: offsetPos.y };
-    const rect = {
+
+    if (!isPointInsideArea(point, canvasRect)) return;
+
+    const imageRect = {
       x: desPos.x,
       y: desPos.y,
       width: desWidth,
       height: desHeight,
     };
 
-    if (isPointInsideArea(point, rect)) {
+    if (isPointInsideArea(point, imageRect)) {
       desPos.x = offsetPos.x - gapPos.x;
       desPos.y = offsetPos.y - gapPos.y;
     } else {
@@ -121,14 +147,48 @@ canvas.addEventListener("touchmove", (e) => {
       gapPos.y = offsetPos.y - desPos.y;
     }
   }
+
+  if (isPinching) {
+    const currentDistance = getDistance(
+      { x: e.touches[0].clientX, y: e.touches[0].clientY },
+      { x: e.touches[1].clientX, y: e.touches[1].clientY }
+    );
+
+    const pinchScale = currentDistance / startDistance;
+    const newScale = baseScale * pinchScale;
+    scale = Math.max(0.5, Math.min(3, newScale));
+
+    // Find the pinchMidPoint of the two fingers in canvas coordinates
+    pinchMidPoint = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - canvasDOMRect.left,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - canvasDOMRect.top,
+    };
+
+    // Compute how the pinchMidPoint moves in image space
+    const prevImageX = (pinchMidPoint.x - desPos.x) / baseScale;
+    const prevImageY = (pinchMidPoint.y - desPos.y) / baseScale;
+
+    console.log({ prevImageX, prevImageY });
+
+    const newImageX = prevImageX * scale;
+    const newImageY = prevImageY * scale;
+
+    // Adjust desPos so pinchMidPoint stays in place visually
+    desPos.x = pinchMidPoint.x - newImageX;
+    desPos.y = pinchMidPoint.y - newImageY;
+  }
 });
 
 canvas.addEventListener("touchend", (e) => {
   e.preventDefault();
   console.log("touch end", e);
+  isPanning = false;
+  isPinching = false;
 });
 
 function draw() {
+  const drawWidth = desWidth * scale;
+  const drawHeight = desHeight * scale;
   ctx.drawImage(
     imgEl,
     0,
@@ -137,11 +197,25 @@ function draw() {
     imgEl.naturalHeight,
     desPos.x,
     desPos.y,
-    desWidth,
-    desHeight
+    drawWidth,
+    drawHeight
   );
 
+  if (isPinching && pinchMidPoint) {
+    drawpinchMidPoint();
+  }
+
   drawGrid();
+}
+
+function drawpinchMidPoint() {
+  ctx.beginPath();
+  ctx.arc(pinchMidPoint.x, pinchMidPoint.y, 10 * scale, 0, Math.PI * 2);
+  ctx.strokeStyle = "red";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,0,0,0.3)";
+  ctx.fill();
 }
 
 function getSizeFromUserInput(formEle) {
