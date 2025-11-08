@@ -7,6 +7,9 @@ const formSizeEl = document.querySelector("#select-size-form");
 const imgSelectEl = document.querySelector("#picture-orientation");
 const ROWS = 3;
 const COLS = 3;
+const SCALE_MOVING_FACTOR = 40;
+const MAX_SCALE = 10;
+const MIN_SCALE = 0.5;
 
 function getDistance(pointA, pointB) {
   return Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
@@ -117,6 +120,12 @@ canvas.addEventListener("touchstart", (e) => {
 canvas.addEventListener("touchmove", (e) => {
   e.preventDefault();
   const canvasDOMRect = canvas.getBoundingClientRect();
+  const imageRect = {
+    x: desPos.x,
+    y: desPos.y,
+    width: desWidth * scale,
+    height: desHeight * scale,
+  };
 
   if (isPanning) {
     const canvasRect = {
@@ -132,20 +141,14 @@ canvas.addEventListener("touchmove", (e) => {
 
     if (!isPointInsideArea(point, canvasRect)) return;
 
-    const imageRect = {
-      x: desPos.x,
-      y: desPos.y,
-      width: desWidth,
-      height: desHeight,
-    };
-
     if (isPointInsideArea(point, imageRect)) {
       desPos.x = offsetPos.x - gapPos.x;
       desPos.y = offsetPos.y - gapPos.y;
-    } else {
-      gapPos.x = offsetPos.x - desPos.x;
-      gapPos.y = offsetPos.y - desPos.y;
+      return;
     }
+
+    gapPos.x = offsetPos.x - desPos.x;
+    gapPos.y = offsetPos.y - desPos.y;
   }
 
   if (isPinching) {
@@ -154,28 +157,34 @@ canvas.addEventListener("touchmove", (e) => {
       { x: e.touches[1].clientX, y: e.touches[1].clientY }
     );
 
-    const pinchScale = currentDistance / startDistance;
-    const newScale = baseScale * pinchScale;
-    scale = Math.max(0.5, Math.min(3, newScale));
-
     // Find the pinchMidPoint of the two fingers in canvas coordinates
     pinchMidPoint = {
       x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - canvasDOMRect.left,
       y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - canvasDOMRect.top,
     };
+    const imageRect = {
+      x: desPos.x,
+      y: desPos.y,
+      width: desWidth * scale,
+      height: desHeight * scale,
+    };
 
-    // Compute how the pinchMidPoint moves in image space
-    const prevImageX = (pinchMidPoint.x - desPos.x) / baseScale;
-    const prevImageY = (pinchMidPoint.y - desPos.y) / baseScale;
+    if (!isPointInsideArea(pinchMidPoint, imageRect)) return;
 
-    console.log({ prevImageX, prevImageY });
+    const prevScale = scale;
+    const pinchScale = currentDistance / startDistance;
+    const newScale = baseScale * pinchScale;
+    scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+    const deltaScale = scale - prevScale;
 
-    const newImageX = prevImageX * scale;
-    const newImageY = prevImageY * scale;
+    /**
+     * each direction have the same scale factor
+     * so the direction to scale down is base on vector 45 degree
+     */
+    const dir = { x: Math.cos(Math.PI / 4), y: Math.sin(Math.PI / 4) };
 
-    // Adjust desPos so pinchMidPoint stays in place visually
-    desPos.x = pinchMidPoint.x - newImageX;
-    desPos.y = pinchMidPoint.y - newImageY;
+    desPos.x -= deltaScale * dir.x * SCALE_MOVING_FACTOR;
+    desPos.y -= deltaScale * dir.y * SCALE_MOVING_FACTOR;
   }
 });
 
