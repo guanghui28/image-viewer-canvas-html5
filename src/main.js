@@ -34,9 +34,19 @@ let baseScale = 1;
 let desWidth = 0;
 let desHeight = 0;
 let pinchMidPoint = null;
+
+/**
+ * The destination coordinate to start render image to canvas
+ */
 const desPos = { x: 0, y: 0 };
-const offsetPos = { x: 0, y: 0 };
-const gapPos = { x: 0, y: 0 };
+/**
+ * starting position when the first finger take action
+ */
+const startPos = { x: 0, y: 0 };
+/**
+ * The gap vector between starting position to destinate position
+ */
+const diff = { x: 0, y: 0 };
 
 canvas.addEventListener("touchstart", (e) => {
   e.preventDefault();
@@ -45,10 +55,10 @@ canvas.addEventListener("touchstart", (e) => {
     isPanning = true;
     isPinching = false;
     const canvasDOMRect = canvas.getBoundingClientRect();
-    offsetPos.x = e.touches[0].clientX - canvasDOMRect.x;
-    offsetPos.y = e.touches[0].clientY - canvasDOMRect.y;
-    gapPos.x = offsetPos.x - desPos.x;
-    gapPos.y = offsetPos.y - desPos.y;
+    startPos.x = e.touches[0].clientX - canvasDOMRect.x;
+    startPos.y = e.touches[0].clientY - canvasDOMRect.y;
+    diff.x = startPos.x - desPos.x;
+    diff.y = startPos.y - desPos.y;
   } else if (e.touches.length === 2) {
     isPinching = true;
     isPanning = false;
@@ -78,20 +88,20 @@ canvas.addEventListener("touchmove", (e) => {
       height: canvasDOMRect.height,
     };
 
-    offsetPos.x = e.touches[0].clientX - canvasDOMRect.x;
-    offsetPos.y = e.touches[0].clientY - canvasDOMRect.y;
-    const point = { x: offsetPos.x, y: offsetPos.y };
+    startPos.x = e.touches[0].clientX - canvasDOMRect.x;
+    startPos.y = e.touches[0].clientY - canvasDOMRect.y;
+    const point = { x: startPos.x, y: startPos.y };
 
-    if (!isPointInsideArea(offsetPos, canvasRect)) return;
+    if (!isPointInsideArea(startPos, canvasRect)) return;
 
     if (isPointInsideArea(point, imageRect)) {
-      desPos.x = offsetPos.x - gapPos.x;
-      desPos.y = offsetPos.y - gapPos.y;
+      desPos.x = startPos.x - diff.x;
+      desPos.y = startPos.y - diff.y;
       return;
     }
 
-    gapPos.x = offsetPos.x - desPos.x;
-    gapPos.y = offsetPos.y - desPos.y;
+    diff.x = startPos.x - desPos.x;
+    diff.y = startPos.y - desPos.y;
   }
 
   if (isPinching) {
