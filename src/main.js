@@ -1,10 +1,6 @@
 import "./style.css";
-import {
-  drawGrid,
-  drawPoint,
-  setupRenderPositionOnCanvas,
-} from "./utils/canvas";
-import { getDistance, isPointInsideArea } from "./utils/math";
+import { drawGrid, drawPoint, getInitialDestinationInfo } from "./utils/canvas";
+import { getDistance, isPointInsideArea, isRectInside } from "./utils/math";
 
 /**
  * DOM ELEMENTS
@@ -26,7 +22,6 @@ const imageScaleText = metricEl.querySelector("#image-scale");
  */
 const ROWS = 3;
 const COLS = 3;
-const SCALE_MOVING_FACTOR = 40;
 const MAX_SCALE = 10;
 const MIN_SCALE = 0.5;
 const DEBUG_MODE = {
@@ -36,6 +31,12 @@ const DEBUG_MODE = {
 const ORIENTATION = {
   LANDSCAPE: "landscape",
   PORTRAIT: "portrait",
+};
+let initialDestinationInfo = {
+  desX: 0,
+  desY: 0,
+  desW: 0,
+  desH: 0,
 };
 
 /**
@@ -66,7 +67,7 @@ const startPos = { x: 0, y: 0 };
 const diff = { x: 0, y: 0 };
 
 /**
- *
+ * rounded number good for drawing perfomances
  */
 const drawInfo = {
   x: Math.round(desPos.x),
@@ -175,16 +176,11 @@ function startAnimation(cavasWidth, canvasHeight) {
   canvas.width = cavasWidth;
   canvas.height = canvasHeight;
 
-  const {
-    desX,
-    desY,
-    desWidth: dW,
-    desHeight: dH,
-  } = setupRenderPositionOnCanvas(imgEl, canvas);
-  desPos.x = desX;
-  desPos.y = desY;
-  desWidth = dW;
-  desHeight = dH;
+  initialDestinationInfo = getInitialDestinationInfo(imgEl, canvas);
+  desPos.x = initialDestinationInfo.desX;
+  desPos.y = initialDestinationInfo.desY;
+  desWidth = initialDestinationInfo.desW;
+  desHeight = initialDestinationInfo.desH;
 
   animate();
 }
@@ -300,22 +296,39 @@ const attachCanvasEventListeners = () => {
       const pinchScale = currentDistance / startDistance;
       const newScale = baseScale * pinchScale;
       scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
-      const deltaScale = scale - prevScale;
-
-      /**
-       * each direction have the same scale factor
-       * so the direction to scale down is base on vector 45 degree
-       */
-      const dir = { x: Math.cos(Math.PI / 4), y: Math.sin(Math.PI / 4) };
-
-      desPos.x -= deltaScale * dir.x * SCALE_MOVING_FACTOR;
-      desPos.y -= deltaScale * dir.y * SCALE_MOVING_FACTOR;
+      const scaleFactor = scale / prevScale;
+      desPos.x = pinchMidPoint.x - (pinchMidPoint.x - desPos.x) * scaleFactor;
+      desPos.y = pinchMidPoint.y - (pinchMidPoint.y - desPos.y) * scaleFactor;
     }
   });
 
   canvas.addEventListener("touchend", (e) => {
     e.preventDefault();
-    console.log("touch end", e);
+
+    const canvasRect = {
+      x: 0,
+      y: 0,
+      width: canvas.width,
+      height: canvas.height,
+    };
+    const imageRect = {
+      x: desPos.x,
+      y: desPos.y,
+      width: desWidth * scale,
+      height: desHeight * scale,
+    };
+
+    if (!isRectInside(canvasRect, imageRect)) {
+      initialDestinationInfo = getInitialDestinationInfo(imgEl, canvas);
+      desPos.x = initialDestinationInfo.desX;
+      desPos.y = initialDestinationInfo.desY;
+      desWidth = initialDestinationInfo.desW;
+      desHeight = initialDestinationInfo.desH;
+
+      scale = 1;
+      baseScale = 1;
+    }
+
     isPanning = false;
     isPinching = false;
     startDistance = 0;
