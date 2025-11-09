@@ -75,6 +75,14 @@ const drawInfo = {
   height: Math.round(desHeight * scale),
 };
 
+function resetAppState() {
+  isPinching = false;
+  isPanning = false;
+  startDistance = 0;
+  scale = 1;
+  baseScale = 1;
+}
+
 function getImageSource(orientation) {
   return orientation === ORIENTATION.LANDSCAPE
     ? "./nature-landscape.png"
@@ -310,6 +318,7 @@ const attachCanvasEventListeners = () => {
     console.log("touch end", e);
     isPanning = false;
     isPinching = false;
+    startDistance = 0;
   });
 };
 
@@ -319,6 +328,7 @@ const attachAppEventListeners = () => {
 
   imgSelectEl.addEventListener("change", (e) => {
     imgEl.src = getImageSource(e.target.value);
+    resetAppState();
   });
 
   debugModeEl.addEventListener("change", (e) => {
