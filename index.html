@@ -34,15 +34,28 @@
         </form>
 
         <div class="form-group">
-          <label for="picture-orientation">Picture Orientation</label>
+          <label for="picture-orientation">Picture</label>
           <select id="picture-orientation">
             <option value="landscape" selected>Landscape</option>
             <option value="portrait">Portrait</option>
           </select>
         </div>
+
+        <div class="form-group">
+          <label for="debug-mode">Debug</label>
+          <select id="debug-mode">
+            <option value="on" selected>On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
       </div>
       <div id="canvas-container">
         <canvas id="main-canvas"></canvas>
+      </div>
+      <div id="metric">
+        <p>Destination: <span id="destination-point"></span></p>
+        <p><span id="image-width"></span>, <span id="image-height"></span></p>
+        <p>Scale: <span id="image-scale"></span></p>
       </div>
       <img id="imgEl" src="./nature.png" style="display: none" />
     </div>

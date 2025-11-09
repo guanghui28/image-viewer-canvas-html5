@@ -1,26 +1,42 @@
 import "./style.css";
-import { setupRenderPositionOnCanvas } from "./utils/canvas";
+import {
+  drawGrid,
+  drawPoint,
+  setupRenderPositionOnCanvas,
+} from "./utils/canvas";
 import { getDistance, isPointInsideArea } from "./utils/math";
 
 /**
- * CONSTANTS
+ * DOM ELEMENTS
  */
 const imgEl = document.querySelector("#imgEl");
 const canvas = document.querySelector("#main-canvas");
 const ctx = canvas.getContext("2d");
 const formSizeEl = document.querySelector("#select-size-form");
 const imgSelectEl = document.querySelector("#picture-orientation");
+const debugModeEl = document.querySelector("#debug-mode");
+const metricEl = document.querySelector("#metric");
+const destinationPointText = metricEl.querySelector("#destination-point");
+const imageWidthText = metricEl.querySelector("#image-width");
+const imageHeightText = metricEl.querySelector("#image-height");
+const imageScaleText = metricEl.querySelector("#image-scale");
+
+/**
+ * CONSTANTS
+ */
 const ROWS = 3;
 const COLS = 3;
 const SCALE_MOVING_FACTOR = 40;
 const MAX_SCALE = 10;
 const MIN_SCALE = 0.5;
-
-function getImageSource(orientation) {
-  return orientation === "landscape"
-    ? "./nature-landscape.png"
-    : "./nature-portrait.png";
-}
+const DEBUG_MODE = {
+  ON: "on",
+  OFF: "off",
+};
+const ORIENTATION = {
+  LANDSCAPE: "landscape",
+  PORTRAIT: "portrait",
+};
 
 /**
  * STATES
@@ -34,6 +50,7 @@ let baseScale = 1;
 let desWidth = 0;
 let desHeight = 0;
 let pinchMidPoint = null;
+let isDebug = false;
 
 /**
  * The destination coordinate to start render image to canvas
@@ -48,136 +65,59 @@ const startPos = { x: 0, y: 0 };
  */
 const diff = { x: 0, y: 0 };
 
-canvas.addEventListener("touchstart", (e) => {
-  e.preventDefault();
+/**
+ *
+ */
+const drawInfo = {
+  x: Math.round(desPos.x),
+  y: Math.round(desPos.y),
+  width: Math.round(desWidth * scale),
+  height: Math.round(desHeight * scale),
+};
 
-  if (e.touches.length === 1) {
-    isPanning = true;
-    isPinching = false;
-    const canvasDOMRect = canvas.getBoundingClientRect();
-    startPos.x = e.touches[0].clientX - canvasDOMRect.x;
-    startPos.y = e.touches[0].clientY - canvasDOMRect.y;
-    diff.x = startPos.x - desPos.x;
-    diff.y = startPos.y - desPos.y;
-  } else if (e.touches.length === 2) {
-    isPinching = true;
-    isPanning = false;
-    startDistance = getDistance(
-      { x: e.touches[0].clientX, y: e.touches[0].clientY },
-      { x: e.touches[1].clientX, y: e.touches[1].clientY }
-    );
-    baseScale = scale;
-  }
-});
-
-canvas.addEventListener("touchmove", (e) => {
-  e.preventDefault();
-  const canvasDOMRect = canvas.getBoundingClientRect();
-  const imageRect = {
-    x: desPos.x,
-    y: desPos.y,
-    width: desWidth * scale,
-    height: desHeight * scale,
-  };
-
-  if (isPanning) {
-    const canvasRect = {
-      x: 0,
-      y: 0,
-      width: canvasDOMRect.width,
-      height: canvasDOMRect.height,
-    };
-
-    startPos.x = e.touches[0].clientX - canvasDOMRect.x;
-    startPos.y = e.touches[0].clientY - canvasDOMRect.y;
-    const point = { x: startPos.x, y: startPos.y };
-
-    if (!isPointInsideArea(startPos, canvasRect)) return;
-
-    if (isPointInsideArea(point, imageRect)) {
-      desPos.x = startPos.x - diff.x;
-      desPos.y = startPos.y - diff.y;
-      return;
-    }
-
-    diff.x = startPos.x - desPos.x;
-    diff.y = startPos.y - desPos.y;
-  }
-
-  if (isPinching) {
-    const currentDistance = getDistance(
-      { x: e.touches[0].clientX, y: e.touches[0].clientY },
-      { x: e.touches[1].clientX, y: e.touches[1].clientY }
-    );
-
-    // Find the pinchMidPoint of the two fingers in canvas coordinates
-    pinchMidPoint = {
-      x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - canvasDOMRect.left,
-      y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - canvasDOMRect.top,
-    };
-    const imageRect = {
-      x: desPos.x,
-      y: desPos.y,
-      width: desWidth * scale,
-      height: desHeight * scale,
-    };
-
-    if (!isPointInsideArea(pinchMidPoint, imageRect)) return;
-
-    const prevScale = scale;
-    const pinchScale = currentDistance / startDistance;
-    const newScale = baseScale * pinchScale;
-    scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
-    const deltaScale = scale - prevScale;
-
-    /**
-     * each direction have the same scale factor
-     * so the direction to scale down is base on vector 45 degree
-     */
-    const dir = { x: Math.cos(Math.PI / 4), y: Math.sin(Math.PI / 4) };
-
-    desPos.x -= deltaScale * dir.x * SCALE_MOVING_FACTOR;
-    desPos.y -= deltaScale * dir.y * SCALE_MOVING_FACTOR;
-  }
-});
-
-canvas.addEventListener("touchend", (e) => {
-  e.preventDefault();
-  console.log("touch end", e);
-  isPanning = false;
-  isPinching = false;
-});
+function getImageSource(orientation) {
+  return orientation === ORIENTATION.LANDSCAPE
+    ? "./nature-landscape.png"
+    : "./nature-portrait.png";
+}
 
 function draw() {
-  const drawWidth = desWidth * scale;
-  const drawHeight = desHeight * scale;
   ctx.drawImage(
     imgEl,
     0,
     0,
     imgEl.naturalWidth,
     imgEl.naturalHeight,
-    desPos.x,
-    desPos.y,
-    drawWidth,
-    drawHeight
+    drawInfo.x,
+    drawInfo.y,
+    drawInfo.width,
+    drawInfo.height
   );
 
-  if (isPinching && pinchMidPoint) {
-    drawpinchMidPoint();
-  }
-
-  drawGrid();
+  drawGrid({
+    ctx,
+    cols: COLS,
+    rows: ROWS,
+    strokeColor: "#1c1c1c",
+  });
 }
 
-function drawpinchMidPoint() {
-  ctx.beginPath();
-  ctx.arc(pinchMidPoint.x, pinchMidPoint.y, 10 * scale, 0, Math.PI * 2);
-  ctx.strokeStyle = "red";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.fillStyle = "rgba(255,0,0,0.3)";
-  ctx.fill();
+function drawDebug() {
+  if (isPinching && pinchMidPoint) {
+    drawPoint(ctx, {
+      x: pinchMidPoint.x,
+      y: pinchMidPoint.y,
+      radius: 10 * scale,
+      strokeColor: "red",
+      color: "rgba(255, 0, 0, 0.3)",
+    });
+  }
+
+  drawPoint(ctx, {
+    x: desPos.x,
+    y: desPos.y,
+    radius: 5,
+  });
 }
 
 function getSizeFromUserInput(formEle) {
@@ -188,66 +128,45 @@ function getSizeFromUserInput(formEle) {
   return { width, height };
 }
 
-formSizeEl.addEventListener("submit", (e) => {
-  e.preventDefault();
-
-  const { width, height } = getSizeFromUserInput(e.target);
-
-  if (document.activeElement) {
-    document.activeElement.blur();
-  }
-
-  if (!width || !height) {
-    e.target.reset();
-    return;
-  }
-
-  startAnimation(width, height);
-});
-
-imgSelectEl.addEventListener("change", (e) => {
-  imgEl.src = getImageSource(e.target.value);
-});
-
-function drawGrid() {
-  const rowGap = canvas.height / ROWS;
-  const colGap = canvas.width / COLS;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = "#dfdfdf";
-
-  for (let i = 0; i <= ROWS; i++) {
-    ctx.moveTo(0, i * rowGap);
-    ctx.lineTo(canvas.width, i * rowGap);
-  }
-
-  for (let i = 0; i <= COLS; i++) {
-    ctx.moveTo(i * colGap, 0);
-    ctx.lineTo(i * colGap, canvas.height);
-  }
-
-  ctx.stroke();
-  ctx.restore();
-}
-
 function stopAnimation(id) {
   window.cancelAnimationFrame(id);
+}
+
+function updateMetricBoard() {
+  destinationPointText.textContent = `x: ${drawInfo.x}, y: ${drawInfo.y}`;
+  imageWidthText.textContent = `Width: ${drawInfo.width}`;
+  imageHeightText.textContent = `Height: ${drawInfo.height}`;
+  imageScaleText.textContent = `${scale.toFixed(6)}`;
+}
+
+function updateDrawInfo() {
+  drawInfo.x = Math.round(desPos.x);
+  drawInfo.y = Math.round(desPos.y);
+  drawInfo.width = Math.round(desWidth * scale);
+  drawInfo.height = Math.round(desHeight * scale);
 }
 
 function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  updateDrawInfo();
+
   draw();
+
+  if (isDebug) {
+    drawDebug();
+    updateMetricBoard();
+  }
 
   animationID = window.requestAnimationFrame(animate);
 }
 
 function startAnimation(cavasWidth, canvasHeight) {
   stopAnimation(animationID);
+
   canvas.width = cavasWidth;
   canvas.height = canvasHeight;
+
   const {
     desX,
     desY,
@@ -262,13 +181,162 @@ function startAnimation(cavasWidth, canvasHeight) {
   animate();
 }
 
-function main() {
-  const { width, height } = getSizeFromUserInput(formSizeEl);
-  startAnimation(width, height);
+function setMetricBoardVisibility(isDebug) {
+  if (isDebug) {
+    metricEl.classList.add("show");
+  } else {
+    metricEl.classList.remove("show");
+  }
 }
 
-imgEl.src = getImageSource(imgSelectEl.value);
+const attachFormSizeEventListeners = () => {
+  formSizeEl.addEventListener("submit", (e) => {
+    e.preventDefault();
 
-imgEl.addEventListener("load", () => {
-  main();
-});
+    const { width, height } = getSizeFromUserInput(e.target);
+
+    if (document.activeElement) {
+      document.activeElement.blur();
+    }
+
+    if (!width || !height) {
+      e.target.reset();
+      return;
+    }
+
+    startAnimation(width, height);
+  });
+};
+
+const attachCanvasEventListeners = () => {
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+
+    if (e.touches.length === 1) {
+      isPanning = true;
+      isPinching = false;
+      const canvasDOMRect = canvas.getBoundingClientRect();
+      startPos.x = e.touches[0].clientX - canvasDOMRect.x;
+      startPos.y = e.touches[0].clientY - canvasDOMRect.y;
+      diff.x = startPos.x - desPos.x;
+      diff.y = startPos.y - desPos.y;
+    } else if (e.touches.length === 2) {
+      isPinching = true;
+      isPanning = false;
+      startDistance = getDistance(
+        { x: e.touches[0].clientX, y: e.touches[0].clientY },
+        { x: e.touches[1].clientX, y: e.touches[1].clientY }
+      );
+      baseScale = scale;
+    }
+  });
+
+  canvas.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    const canvasDOMRect = canvas.getBoundingClientRect();
+    const imageRect = {
+      x: desPos.x,
+      y: desPos.y,
+      width: desWidth * scale,
+      height: desHeight * scale,
+    };
+
+    if (isPanning) {
+      const canvasRect = {
+        x: 0,
+        y: 0,
+        width: canvasDOMRect.width,
+        height: canvasDOMRect.height,
+      };
+
+      startPos.x = e.touches[0].clientX - canvasDOMRect.x;
+      startPos.y = e.touches[0].clientY - canvasDOMRect.y;
+      const point = { x: startPos.x, y: startPos.y };
+
+      if (!isPointInsideArea(startPos, canvasRect)) return;
+
+      if (isPointInsideArea(point, imageRect)) {
+        desPos.x = startPos.x - diff.x;
+        desPos.y = startPos.y - diff.y;
+        return;
+      }
+
+      diff.x = startPos.x - desPos.x;
+      diff.y = startPos.y - desPos.y;
+    }
+
+    if (isPinching) {
+      const currentDistance = getDistance(
+        { x: e.touches[0].clientX, y: e.touches[0].clientY },
+        { x: e.touches[1].clientX, y: e.touches[1].clientY }
+      );
+
+      // Find the pinchMidPoint of the two fingers in canvas coordinates
+      pinchMidPoint = {
+        x:
+          (e.touches[0].clientX + e.touches[1].clientX) / 2 -
+          canvasDOMRect.left,
+        y:
+          (e.touches[0].clientY + e.touches[1].clientY) / 2 - canvasDOMRect.top,
+      };
+      const imageRect = {
+        x: desPos.x,
+        y: desPos.y,
+        width: desWidth * scale,
+        height: desHeight * scale,
+      };
+
+      if (!isPointInsideArea(pinchMidPoint, imageRect)) return;
+
+      const prevScale = scale;
+      const pinchScale = currentDistance / startDistance;
+      const newScale = baseScale * pinchScale;
+      scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+      const deltaScale = scale - prevScale;
+
+      /**
+       * each direction have the same scale factor
+       * so the direction to scale down is base on vector 45 degree
+       */
+      const dir = { x: Math.cos(Math.PI / 4), y: Math.sin(Math.PI / 4) };
+
+      desPos.x -= deltaScale * dir.x * SCALE_MOVING_FACTOR;
+      desPos.y -= deltaScale * dir.y * SCALE_MOVING_FACTOR;
+    }
+  });
+
+  canvas.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    console.log("touch end", e);
+    isPanning = false;
+    isPinching = false;
+  });
+};
+
+const attachAppEventListeners = () => {
+  attachFormSizeEventListeners();
+  attachCanvasEventListeners();
+
+  imgSelectEl.addEventListener("change", (e) => {
+    imgEl.src = getImageSource(e.target.value);
+  });
+
+  debugModeEl.addEventListener("change", (e) => {
+    isDebug = e.target.value === DEBUG_MODE.ON;
+    setMetricBoardVisibility(isDebug);
+  });
+
+  imgEl.addEventListener("load", () => {
+    const { width, height } = getSizeFromUserInput(formSizeEl);
+    startAnimation(width, height);
+  });
+};
+
+const main = () => {
+  attachAppEventListeners();
+  imgEl.src = getImageSource(imgSelectEl.value);
+  isDebug = debugModeEl.value === DEBUG_MODE.ON;
+  setMetricBoardVisibility(isDebug);
+};
+
+main();

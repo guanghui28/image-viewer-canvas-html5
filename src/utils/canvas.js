@@ -124,3 +124,47 @@ export function setupRenderPositionOnCanvas(image, canvas) {
     desHeight,
   };
 }
+
+export function drawPoint(
+  ctx,
+  {
+    x,
+    y,
+    radius,
+    strokeColor = "red",
+    color = "rgba(255, 0, 0, 0.3)",
+    lineWidth = 1,
+  }
+) {
+  ctx.beginPath();
+  ctx.arc(Math.round(x), Math.round(y), radius, 0, Math.PI * 2);
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+export function drawGrid({ ctx, rows, cols, strokeColor, lineWidth = 1 }) {
+  const canvas = ctx.canvas;
+  const rowGap = canvas.height / rows;
+  const colGap = canvas.width / cols;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = strokeColor;
+
+  for (let i = 0; i <= rows; i++) {
+    ctx.moveTo(0, i * rowGap);
+    ctx.lineTo(canvas.width, i * rowGap);
+  }
+
+  for (let i = 0; i <= cols; i++) {
+    ctx.moveTo(i * colGap, 0);
+    ctx.lineTo(i * colGap, canvas.height);
+  }
+
+  ctx.stroke();
+  ctx.restore();
+}

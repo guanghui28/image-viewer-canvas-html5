@@ -71,3 +71,28 @@ form {
   align-items: center;
   justify-content: center;
 }
+
+#metric {
+  position: fixed;
+  border-right: 1px solid #ccc;
+  background-color: #efefef;
+  box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.2);
+  padding: 2rem;
+  bottom: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  transition: bottom 0.6s ease;
+  border-top-right-radius: 12px;
+  border-top-left-radius: 12px;
+  z-index: 1000;
+  width: 40vw;
+  min-width: 30rem;
+
+  p {
+    font-size: 1.6rem;
+  }
+}
+
+#metric.show {
+  bottom: 0;
+}
