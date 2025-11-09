@@ -125,6 +125,29 @@ export function setupRenderPositionOnCanvas(image, canvas) {
   };
 }
 
+/**
+ * Draws a circular point on a 2D canvas context.
+ *
+ * @function drawPoint
+ * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context to draw on.
+ * @param {Object} options - Configuration options for the point.
+ * @param {number} options.x - The x-coordinate of the point center.
+ * @param {number} options.y - The y-coordinate of the point center.
+ * @param {number} options.radius - The radius of the point.
+ * @param {string} [options.strokeColor="red"] - The stroke color of the point’s outline.
+ * @param {string} [options.color="rgba(255, 0, 0, 0.3)"] - The fill color of the point.
+ * @param {number} [options.lineWidth=1] - The width of the outline stroke.
+ *
+ * @example
+ * drawPoint(ctx, {
+ *   x: 50,
+ *   y: 75,
+ *   radius: 5,
+ *   strokeColor: "#ff0000",
+ *   color: "rgba(255, 0, 0, 0.2)",
+ *   lineWidth: 2
+ * });
+ */
 export function drawPoint(
   ctx,
   {
@@ -145,6 +168,26 @@ export function drawPoint(
   ctx.fill();
 }
 
+/**
+ * Draws a grid on a canvas element by dividing it into the specified number of rows and columns.
+ *
+ * @function drawGrid
+ * @param {Object} options - Configuration options for the grid.
+ * @param {CanvasRenderingContext2D} options.ctx - The canvas 2D rendering context to draw on.
+ * @param {number} options.rows - The number of horizontal grid lines (rows).
+ * @param {number} options.cols - The number of vertical grid lines (columns).
+ * @param {string} options.strokeColor - The color of the grid lines.
+ * @param {number} [options.lineWidth=1] - The width of the grid lines.
+ *
+ * @example
+ * drawGrid({
+ *   ctx,
+ *   rows: 10,
+ *   cols: 10,
+ *   strokeColor: "#ccc",
+ *   lineWidth: 1
+ * });
+ */
 export function drawGrid({ ctx, rows, cols, strokeColor, lineWidth = 1 }) {
   const canvas = ctx.canvas;
   const rowGap = canvas.height / rows;
