@@ -1,6 +1,13 @@
 import "./style.css";
 import { drawGrid, drawPoint, getInitialDestinationInfo } from "./utils/canvas";
-import { getDistance, isPointInsideArea, isRectInside } from "./utils/math";
+import {
+  easeOutBack,
+  easeOutElastic,
+  getDistance,
+  isPointInsideArea,
+  isRectInside,
+  lerp,
+} from "./utils/math";
 
 /**
  * DOM ELEMENTS
@@ -52,6 +59,11 @@ let desWidth = 0;
 let desHeight = 0;
 let pinchMidPoint = null;
 let isDebug = false;
+let isBouncing = false;
+let bounceStartTime = 0;
+const BOUNCE_DURATION = 500;
+let bounceFrom = { x: 0, y: 0, scale: 1 };
+let bounceTo = { x: 0, y: 0, scale: 1 };
 
 /**
  * The destination coordinate to start render image to canvas
@@ -112,7 +124,7 @@ function draw() {
 }
 
 function drawDebug() {
-  if (isPinching && pinchMidPoint) {
+  if (pinchMidPoint) {
     drawPoint(ctx, {
       x: pinchMidPoint.x,
       y: pinchMidPoint.y,
@@ -155,8 +167,27 @@ function updateDrawInfo() {
   drawInfo.height = Math.round(desHeight * scale);
 }
 
-function animate() {
+function animate(timestamp = 0) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (isBouncing) {
+    const elapsed = timestamp - bounceStartTime;
+    const t = Math.min(elapsed / BOUNCE_DURATION, 1);
+
+    // Ease-out-back function for bouncy effect
+    const eased = easeOutElastic(t);
+
+    desPos.x = lerp(bounceFrom.x, bounceTo.x, eased);
+    desPos.y = lerp(bounceFrom.y, bounceTo.y, eased);
+    scale = lerp(bounceFrom.scale, bounceTo.scale, eased);
+
+    if (t >= 1) {
+      isBouncing = false;
+      baseScale = 1;
+      scale = 1;
+      console.log("end");
+    }
+  }
 
   updateDrawInfo();
 
@@ -237,6 +268,11 @@ const attachCanvasEventListeners = () => {
 
   canvas.addEventListener("touchmove", (e) => {
     e.preventDefault();
+
+    if (isBouncing) {
+      return;
+    }
+
     const canvasDOMRect = canvas.getBoundingClientRect();
     const imageRect = {
       x: desPos.x,
@@ -305,6 +341,11 @@ const attachCanvasEventListeners = () => {
   canvas.addEventListener("touchend", (e) => {
     e.preventDefault();
 
+    if (isBouncing) {
+      console.log("prevent");
+      return;
+    }
+
     const canvasRect = {
       x: 0,
       y: 0,
@@ -319,14 +360,15 @@ const attachCanvasEventListeners = () => {
     };
 
     if (!isRectInside(canvasRect, imageRect)) {
-      initialDestinationInfo = getInitialDestinationInfo(imgEl, canvas);
-      desPos.x = initialDestinationInfo.desX;
-      desPos.y = initialDestinationInfo.desY;
-      desWidth = initialDestinationInfo.desW;
-      desHeight = initialDestinationInfo.desH;
-
-      scale = 1;
-      baseScale = 1;
+      isBouncing = true;
+      console.log("set bouncing: ", performance.now() - bounceStartTime);
+      bounceStartTime = performance.now();
+      bounceFrom = { x: desPos.x, y: desPos.y, scale };
+      bounceTo = {
+        x: initialDestinationInfo.desX,
+        y: initialDestinationInfo.desY,
+        scale: 1,
+      };
     }
 
     isPanning = false;
