@@ -1,7 +1,6 @@
 import "./style.css";
 import { drawGrid, drawPoint, getInitialDestinationInfo } from "./utils/canvas";
 import {
-  easeOutBack,
   easeOutElastic,
   getDistance,
   isPointInsideArea,
@@ -39,12 +38,7 @@ const ORIENTATION = {
   LANDSCAPE: "landscape",
   PORTRAIT: "portrait",
 };
-let initialDestinationInfo = {
-  desX: 0,
-  desY: 0,
-  desW: 0,
-  desH: 0,
-};
+const BOUNCE_DURATION = 500;
 
 /**
  * STATES
@@ -61,9 +55,8 @@ let pinchMidPoint = null;
 let isDebug = false;
 let isBouncing = false;
 let bounceStartTime = 0;
-const BOUNCE_DURATION = 500;
-let bounceFrom = { x: 0, y: 0, scale: 1 };
-let bounceTo = { x: 0, y: 0, scale: 1 };
+let bounceFrom = null;
+let bounceTo = null;
 
 /**
  * The destination coordinate to start render image to canvas
@@ -87,11 +80,22 @@ const drawInfo = {
   width: Math.round(desWidth * scale),
   height: Math.round(desHeight * scale),
 };
+/**
+ * save information to back starting when bounce animation
+ */
+const intialDesPos = {
+  x: 0,
+  y: 0,
+};
 
 function resetAppState() {
   isPinching = false;
   isPanning = false;
+  isBouncing = false;
+  bounceFrom = null;
+  bounceTo = null;
   startDistance = 0;
+  pinchMidPoint = null;
   scale = 1;
   baseScale = 1;
 }
@@ -167,26 +171,37 @@ function updateDrawInfo() {
   drawInfo.height = Math.round(desHeight * scale);
 }
 
+function animateBouncingEffect(timestamp) {
+  if (!bounceTo || !bounceFrom) return;
+
+  const elapsed = timestamp - bounceStartTime;
+  const t = Math.max(elapsed / BOUNCE_DURATION, 0);
+
+  // Ease-out-back function for bouncy effect
+  const eased = easeOutElastic(t);
+
+  desPos.x = lerp(bounceFrom.x, bounceTo.x, eased);
+  desPos.y = lerp(bounceFrom.y, bounceTo.y, eased);
+  scale = lerp(bounceFrom.scale, bounceTo.scale, eased);
+
+  if (t >= 1) {
+    isBouncing = false;
+    baseScale = 1;
+    scale = 1;
+    isPanning = false;
+    isPinching = false;
+    startDistance = 0;
+    pinchMidPoint = null;
+    bounceTo = null;
+    bounceFrom = null;
+  }
+}
+
 function animate(timestamp = 0) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (isBouncing) {
-    const elapsed = timestamp - bounceStartTime;
-    const t = Math.min(elapsed / BOUNCE_DURATION, 1);
-
-    // Ease-out-back function for bouncy effect
-    const eased = easeOutElastic(t);
-
-    desPos.x = lerp(bounceFrom.x, bounceTo.x, eased);
-    desPos.y = lerp(bounceFrom.y, bounceTo.y, eased);
-    scale = lerp(bounceFrom.scale, bounceTo.scale, eased);
-
-    if (t >= 1) {
-      isBouncing = false;
-      baseScale = 1;
-      scale = 1;
-      console.log("end");
-    }
+    animateBouncingEffect(timestamp);
   }
 
   updateDrawInfo();
@@ -207,11 +222,13 @@ function startAnimation(cavasWidth, canvasHeight) {
   canvas.width = cavasWidth;
   canvas.height = canvasHeight;
 
-  initialDestinationInfo = getInitialDestinationInfo(imgEl, canvas);
-  desPos.x = initialDestinationInfo.desX;
-  desPos.y = initialDestinationInfo.desY;
-  desWidth = initialDestinationInfo.desW;
-  desHeight = initialDestinationInfo.desH;
+  const { desX, desY, desW, desH } = getInitialDestinationInfo(imgEl, canvas);
+  desPos.x = desX;
+  desPos.y = desY;
+  intialDesPos.x = desX;
+  intialDesPos.y = desY;
+  desWidth = desW;
+  desHeight = desH;
 
   animate();
 }
@@ -247,6 +264,8 @@ const attachCanvasEventListeners = () => {
   canvas.addEventListener("touchstart", (e) => {
     e.preventDefault();
 
+    if (isBouncing) return;
+
     if (e.touches.length === 1) {
       isPanning = true;
       isPinching = false;
@@ -269,9 +288,7 @@ const attachCanvasEventListeners = () => {
   canvas.addEventListener("touchmove", (e) => {
     e.preventDefault();
 
-    if (isBouncing) {
-      return;
-    }
+    if (isBouncing) return;
 
     const canvasDOMRect = canvas.getBoundingClientRect();
     const imageRect = {
@@ -341,10 +358,7 @@ const attachCanvasEventListeners = () => {
   canvas.addEventListener("touchend", (e) => {
     e.preventDefault();
 
-    if (isBouncing) {
-      console.log("prevent");
-      return;
-    }
+    if (isBouncing) return;
 
     const canvasRect = {
       x: 0,
@@ -359,21 +373,17 @@ const attachCanvasEventListeners = () => {
       height: desHeight * scale,
     };
 
-    if (!isRectInside(canvasRect, imageRect)) {
+    if (!isRectInside(canvasRect, imageRect) && !isBouncing) {
       isBouncing = true;
-      console.log("set bouncing: ", performance.now() - bounceStartTime);
       bounceStartTime = performance.now();
       bounceFrom = { x: desPos.x, y: desPos.y, scale };
-      bounceTo = {
-        x: initialDestinationInfo.desX,
-        y: initialDestinationInfo.desY,
-        scale: 1,
-      };
+      bounceTo = { x: intialDesPos.x, y: intialDesPos.y, scale: 1 };
     }
 
     isPanning = false;
     isPinching = false;
     startDistance = 0;
+    pinchMidPoint = null;
   });
 };
 
